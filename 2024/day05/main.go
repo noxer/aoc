@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -122,6 +123,8 @@ func task1(args []string) error {
 		return err
 	}
 
+	start := time.Now()
+
 	sum := 0
 	for _, batch := range batches {
 		if applyRules(rules, batch) {
@@ -129,7 +132,9 @@ func task1(args []string) error {
 		}
 	}
 
-	fmt.Printf("Sum: %d\n", sum)
+	elapsed := time.Since(start)
+
+	fmt.Printf("Sum: %d, %s\n", sum, elapsed)
 	return nil
 }
 
