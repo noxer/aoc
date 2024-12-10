@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/noxer/aoc/2024/utils"
@@ -104,14 +106,12 @@ func task1(args []string) error {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 func (e Equation) HasSolution2() bool {
-	return tryOps2(e.Values[0], e.Values[1:], func(i int) bool {
-		return i == e.Result
-	})
+	return tryOps2(e.Values[0], e.Values[1:], e.Result)
 }
 
-func tryOps2(current int, values []int, check func(int) bool) bool {
-	if len(values) == 0 {
-		return check(current)
+func tryOps2(current int, values []int, check int) bool {
+	if len(values) == 0 || current > check {
+		return check == current
 	}
 
 	sum := current + values[0]
@@ -129,8 +129,12 @@ func tryOps2(current int, values []int, check func(int) bool) bool {
 }
 
 func concat(a, b int) int {
-	res, _ := strconv.Atoi(strconv.Itoa(a) + strconv.Itoa(b))
-	return res
+	shift := 1
+	for shift <= b {
+		shift *= 10
+	}
+
+	return a*shift + b
 }
 
 func task2(args []string) error {
@@ -141,11 +145,40 @@ func task2(args []string) error {
 
 	start := time.Now()
 
-	sum := 0
-	for _, equation := range equations {
-		if equation.HasSolution2() {
-			sum += equation.Result
+	in := make(chan Equation, 8)
+	out := make(chan int, 8)
+	wg := sync.WaitGroup{}
+
+	worker := func() {
+		defer wg.Done()
+
+		for eq := range in {
+			if eq.HasSolution2() {
+				out <- eq.Result
+			}
 		}
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	wg.Add(runtime.NumCPU())
+	for range runtime.NumCPU() {
+		go worker()
+	}
+
+	go func() {
+		for _, eq := range equations {
+			in <- eq
+		}
+		close(in)
+	}()
+
+	sum := 0
+	for res := range out {
+		sum += res
 	}
 
 	elapsed := time.Since(start)

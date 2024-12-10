@@ -184,7 +184,7 @@ func (m Map) Check(v Vec, b byte) bool {
 	return m.data[v] == b
 }
 
-func (m Map) WalkWithDir(start Vec) bool {
+func (m Map) WalkWithMovementMap(start Vec, mm map[PosDir]struct{}) bool {
 	pos := start
 	dir := Up
 	for {
@@ -198,11 +198,11 @@ func (m Map) WalkWithDir(start Vec) bool {
 			return false
 		}
 
-		if m.Check(newPos, dirMarker[dir]) {
+		if _, ok := mm[PosDir{newPos, dir}]; ok {
 			return true
 		}
 
-		m.MarkAs(newPos, dirMarker[dir])
+		mm[PosDir{newPos, dir}] = struct{}{}
 		pos = newPos
 	}
 }
@@ -240,6 +240,10 @@ func (m Map) Reset() {
 	}
 }
 
+type PosDir struct {
+	Pos, Dir Vec
+}
+
 func task2(args []string) error {
 	m, s, err := parseMap(args[0])
 	if err != nil {
@@ -249,20 +253,19 @@ func task2(args []string) error {
 	start := time.Now()
 
 	m.Walk(s)
-	c := m.Copy()
+	movementMap := make(map[PosDir]struct{})
 	count := 0
 	for v := range m.IterateEqual('X') {
 		if v == s {
 			continue
 		}
 
-		c.MarkAs(v, '#')
-		if c.WalkWithDir(s) {
+		m.MarkAs(v, '#')
+		if m.WalkWithMovementMap(s, movementMap) {
 			count++
 		}
-
-		c.MarkAs(v, '.')
-		c.Reset()
+		m.MarkAs(v, '.')
+		clear(movementMap)
 	}
 
 	elapsed := time.Since(start)
