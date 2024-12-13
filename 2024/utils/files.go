@@ -39,6 +39,10 @@ func (v Vec) Add(o Vec) Vec {
 	return Vec{v.X + o.X, v.Y + o.Y}
 }
 
+func (v Vec) Mul(s int) Vec {
+	return Vec{v.X * s, v.Y * s}
+}
+
 func ReadMap(name string, ignore ...byte) (map[Vec]byte, error) {
 	f, err := os.Open(name)
 	if err != nil {

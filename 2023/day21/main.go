@@ -5,22 +5,23 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
-	"runtime/pprof"
 	"time"
 )
 
 type empty = struct{}
 
 func main() {
-	f, err := os.Create("profile.pprof")
-	if err != nil {
-		fmt.Printf("Error: %s\n", err)
-		os.Exit(1)
-	}
-	defer f.Close()
+	// f, err := os.Create("profile.pprof")
+	// if err != nil {
+	// 	fmt.Printf("Error: %s\n", err)
+	// 	os.Exit(1)
+	// }
+	// defer f.Close()
 
-	pprof.StartCPUProfile(f)
-	defer pprof.StopCPUProfile()
+	// pprof.StartCPUProfile(f)
+	// defer pprof.StopCPUProfile()
+
+	var err error
 
 	if len(os.Args) <= 1 {
 		fmt.Println("Missing argument, please specify the task you want to execute (1 or 2).")
@@ -195,12 +196,15 @@ func (s Set[T]) MergeWith(o Set[T], f func(T) T) {
 // }
 
 type Map2 struct {
-	m map[Pos]*BitMap
+	m map[Pos]Set[Pos]
 	s Pos
 }
 
 func (m Map2) Move(p Pos, result Map2) {
 	s := m.m[p]
+	if len(s) == 0 {
+		return
+	}
 
 	for _, dir := range directions {
 		newPos := p.Add(dir)
@@ -250,7 +254,7 @@ func (m Map2) CheckNextGarden(p Pos) Pos {
 
 func (m Map2) Reset() {
 	for p := range m.m {
-		clear(m.m[p])
+		m.m[p] = make(Set[Pos])
 	}
 }
 
@@ -261,7 +265,7 @@ func (m Map2) EmptyCopy() Map2 {
 	}
 
 	for p := range m.m {
-		c.m[p] = Set[Pos]{}
+		c.m[p] = make(Set[Pos])
 	}
 
 	return c
@@ -291,7 +295,7 @@ func (m Map2) CanGo(p Pos) bool {
 }
 
 func loadMap2(name string) (m Map2, err error) {
-	m.m = make(map[Pos]*BitMap)
+	m.m = make(map[Pos]Set[Pos])
 
 	f, err := os.Open(name)
 	if err != nil {
@@ -337,10 +341,13 @@ func task2(args []string) error {
 	c := m.EmptyCopy()
 
 	start := time.Now()
-	for range 1000 {
+	for i := range 500 {
+		fmt.Printf("Computing iteration %d...", i)
+		loopStart := time.Now()
 		move2(m, c)
 		m, c = c, m
-		c.Reset()
+		// c.Reset()
+		fmt.Println("ok |", time.Since(loopStart))
 	}
 	duration := time.Since(start)
 
