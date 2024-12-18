@@ -43,6 +43,10 @@ func (v Vec) Mul(s int) Vec {
 	return Vec{v.X * s, v.Y * s}
 }
 
+func (v Vec) Zero() bool {
+	return v.X == 0 && v.Y == 0
+}
+
 func ReadMap(name string, ignore ...byte) (map[Vec]byte, error) {
 	f, err := os.Open(name)
 	if err != nil {
