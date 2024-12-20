@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
+	"time"
 
 	"github.com/noxer/aoc/2024/utils"
 )
@@ -40,7 +42,7 @@ type Maze struct {
 	size  utils.Vec
 	start utils.Vec
 	end   utils.Vec
-	times map[utils.Vec]int
+	times []utils.Vec
 }
 
 func (m *Maze) FindStartAndEnd() {
@@ -72,8 +74,9 @@ func (m Maze) Print() {
 			if b, ok := m.data[pos]; ok {
 				fmt.Print(string(b))
 			} else {
-				if time, ok := m.times[pos]; ok {
-					fmt.Print(time % 10)
+				idx := slices.Index(m.times, pos)
+				if idx >= 0 {
+					fmt.Print(idx % 10)
 				} else {
 					fmt.Print(".")
 				}
@@ -83,12 +86,12 @@ func (m Maze) Print() {
 	}
 }
 
-func (m Maze) PopulateTimes() {
+func (m *Maze) PopulateTimes() {
 	last := m.start
 	pos := m.start
 	time := 0
 	for {
-		m.times[pos] = time
+		m.times = append(m.times, pos)
 
 		if pos == m.end {
 			break
@@ -113,10 +116,15 @@ type Shortcut struct {
 	Saves      int
 }
 
+func (m Maze) GetTime(pos utils.Vec) int {
+	idx := slices.Index(m.times, pos)
+	return max(idx, 0)
+}
+
 func (m Maze) FindShortcuts() []Shortcut {
 	var shortcuts []Shortcut
 
-	for pos, start := range m.times {
+	for start, pos := range m.times {
 		for _, dir := range utils.Directions {
 			next := pos.Add(dir)
 			if !m.Wall(next) {
@@ -124,7 +132,7 @@ func (m Maze) FindShortcuts() []Shortcut {
 			}
 
 			nextNext := next.Add(dir)
-			nextNextTime := m.times[nextNext]
+			nextNextTime := m.GetTime(nextNext)
 
 			if nextNextTime > start+2 {
 				shortcuts = append(shortcuts, Shortcut{
@@ -146,9 +154,8 @@ func task1(args []string) error {
 	}
 
 	maze := Maze{
-		data:  data,
-		size:  size,
-		times: make(map[utils.Vec]int),
+		data: data,
+		size: size,
 	}
 	maze.FindStartAndEnd()
 
@@ -182,25 +189,21 @@ func Distance(a, b utils.Vec) int {
 	return (max(a.X, b.X) - min(a.X, b.X)) + (max(a.Y, b.Y) - min(a.Y, b.Y))
 }
 
-func (m Maze) FindLongShortcuts() map[FromTo]int {
-	shortcuts := make(map[FromTo]int)
+func (m Maze) CountLongShortcuts(limit int) int {
+	shortcuts := 0
 
-	for from, start := range m.times {
-		for to, end := range m.times {
-			if start >= end {
-				continue
-			}
+	for start, from := range m.times[:len(m.times)-limit] {
+		for end, to := range m.times[start+1+limit:] {
+			end += start + 1 + limit
 
 			dist := Distance(from, to)
 			if dist > 20 {
 				continue
 			}
 
-			if end <= start+dist {
-				continue
+			if end-(start+dist) >= limit {
+				shortcuts++
 			}
-
-			shortcuts[FromTo{from, to}] = end - (start + dist)
 		}
 	}
 
@@ -208,33 +211,26 @@ func (m Maze) FindLongShortcuts() map[FromTo]int {
 }
 
 func task2(args []string) error {
-
 	data, size, err := utils.ReadMapWithSize(args[0], '.')
 	if err != nil {
 		return err
 	}
 
+	start := time.Now()
+
 	maze := Maze{
-		data:  data,
-		size:  size,
-		times: make(map[utils.Vec]int),
+		data: data,
+		size: size,
 	}
 	maze.FindStartAndEnd()
 
 	maze.PopulateTimes()
 
-	shortcuts := maze.FindLongShortcuts()
+	shortcuts := maze.CountLongShortcuts(100)
 
-	fmt.Println(shortcuts)
+	elapsed := time.Since(start)
 
-	count := 0
-	for _, saves := range shortcuts {
-		if saves >= 100 {
-			count++
-		}
-	}
-
-	fmt.Printf("Shortcuts >= 100ps: %d\n", count)
+	fmt.Printf("Shortcuts >= 100ps: %d (%s)\n", shortcuts, elapsed)
 
 	return nil
 }
