@@ -31,22 +31,6 @@ func ReadLinesTransform[T any](name string, transformer func(string) T) ([]T, er
 	return ts, s.Err()
 }
 
-type Vec struct {
-	X, Y int
-}
-
-func (v Vec) Add(o Vec) Vec {
-	return Vec{v.X + o.X, v.Y + o.Y}
-}
-
-func (v Vec) Mul(s int) Vec {
-	return Vec{v.X * s, v.Y * s}
-}
-
-func (v Vec) Zero() bool {
-	return v.X == 0 && v.Y == 0
-}
-
 func ReadMap(name string, ignore ...byte) (map[Vec]byte, error) {
 	f, err := os.Open(name)
 	if err != nil {
