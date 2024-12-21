@@ -193,8 +193,10 @@ func (m Maze) CountLongShortcuts(limit int) int {
 	shortcuts := 0
 
 	for start, from := range m.times[:len(m.times)-limit] {
-		for end, to := range m.times[start+1+limit:] {
-			end += start + 1 + limit
+		offset := start + 1 + limit
+
+		for end, to := range m.times[offset:] {
+			end += offset
 
 			dist := Distance(from, to)
 			if dist > 20 {
