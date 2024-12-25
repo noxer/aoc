@@ -11,9 +11,9 @@ import (
 func main() {
 	var err error
 
-	strs := []string{"qff", "qnw", "z16", "pbv", "qqp", "z23", "fbq", "z36"}
-	sort.Strings(strs)
-	fmt.Printf("Result: %s\n", strings.Join(strs, ","))
+	// strs := []string{"qff", "qnw", "z16", "pbv", "qqp", "z23", "fbq", "z36"}
+	// sort.Strings(strs)
+	// fmt.Printf("Result: %s\n", strings.Join(strs, ","))
 
 	if len(os.Args) <= 1 {
 		fmt.Println("Missing argument, please specify the task you want to execute (1 or 2).")
@@ -95,8 +95,12 @@ func (ws WireState) Xor(o WireState) WireState {
 }
 
 type Gate struct {
-	Op      func(a, b WireState) WireState
-	A, B, C string
+	Op         func(a, b WireState) WireState
+	A, B, C, O string
+}
+
+func (g Gate) String() string {
+	return fmt.Sprintf("%s %s %s -> %s", g.A, g.O, g.B, g.C)
 }
 
 func NewAnd(a, b, c string) Gate {
@@ -105,6 +109,7 @@ func NewAnd(a, b, c string) Gate {
 		A:  a,
 		B:  b,
 		C:  c,
+		O:  "AND",
 	}
 }
 
@@ -114,6 +119,7 @@ func NewOr(a, b, c string) Gate {
 		A:  a,
 		B:  b,
 		C:  c,
+		O:  "OR",
 	}
 }
 
@@ -123,6 +129,7 @@ func NewXor(a, b, c string) Gate {
 		A:  a,
 		B:  b,
 		C:  c,
+		O:  "XOR",
 	}
 }
 
@@ -250,29 +257,135 @@ func task1(args []string) error {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+func checkBit(gates []Gate, bit int) bool {
+	wires := make(Wires)
+	original := gates
+	var last []Gate
+
+	for a := range uint64(4) {
+		for b := range uint64(4) {
+			x := a << max(bit-1, 0)
+			y := b << max(bit-1, 0)
+
+			wires.SetX(x)
+			wires.SetY(y)
+
+			for len(gates) > 0 {
+				// fmt.Printf("len(gates) == %d, len(last) == %d\n", len(gates), len(last))
+				gates = runRound(wires, gates)
+
+				if len(last) == len(gates) {
+					return false
+				}
+
+				last = gates
+			}
+
+			output := wires.CalculateOutput()
+			if output != x+y {
+				// fmt.Printf("%d != %d + %d\n", output, x, y)
+				return false
+			}
+
+			clear(wires)
+			gates = original
+		}
+	}
+
+	return true
+}
+
 func task2(args []string) error {
-	wires, gates, err := parseWiresAndGates(args[0])
+	_, gates, err := parseWiresAndGates(args[0])
 	if err != nil {
 		return err
 	}
 
-	clear(wires)
+	var swappedPairs []string
 
-	x := uint64(0b000000000000000000000000000000000000000000000)
-	y := uint64(0b000000000000000000000000000000000100000000000)
+	for n := range 45 {
+		if !checkBit(gates, n) {
+			fmt.Printf("Found error in bit %d\n", n)
 
-	wires.SetX(x)
-	wires.SetY(y)
+			adder := extractAdder(gates, n)
+			fmt.Printf("Extracted adder: %v\n", adder)
 
-	for len(gates) > 0 {
-		gates = runRound(wires, gates)
+			swapped := mutateAndTest(gates, adder, n)
+			if len(swapped) == 0 {
+				fmt.Printf("Couldn't find a permutation for bit %d that works :(\n", n)
+			}
+
+			fmt.Printf("Found pair: %v\n", swapped)
+			swappedPairs = append(swappedPairs, swapped...)
+		}
 	}
 
-	output := wires.CalculateOutput()
-
-	fmt.Printf("Calculation: %d + %d = %d\n", x, y, output)
-	fmt.Printf("Correct:     %d + %d = %d\n", x, y, x+y)
-	fmt.Printf("Binary:      %045b + %045b = %046b\n", x, y, output)
+	sort.Strings(swappedPairs)
+	fmt.Printf("Result: %s\n", strings.Join(swappedPairs, ","))
 
 	return nil
+}
+
+func mutateAndTest(gates []Gate, adder []int, n int) []string {
+	for i, a := range adder {
+		for _, b := range adder[i+1:] {
+			// fmt.Printf("Testing pair %d and %d\n", a, b)
+
+			gates[a].C, gates[b].C = gates[b].C, gates[a].C
+
+			if checkBit(gates, n) {
+				return []string{gates[a].C, gates[b].C}
+			}
+
+			gates[a].C, gates[b].C = gates[b].C, gates[a].C
+		}
+	}
+
+	return nil
+}
+
+func extractAdder(gates []Gate, bit int) []int {
+	adder := findGatesWithInput(gates, fmt.Sprintf("x%02d", bit))
+	adder = append(adder, findGatesWithInput(gates, gates[adder[0]].C)...)
+	adder = append(adder, findGatesWithInput(gates, gates[adder[1]].C)...)
+
+out:
+	for i, a := range adder {
+		ac := gates[a].C
+		for _, b := range adder[i+1:] {
+			bc := gates[b].C
+
+			result := findGatesWithInputs(gates, ac, bc)
+			if len(result) > 0 {
+				adder = append(adder, result...)
+				break out
+			}
+		}
+	}
+
+	return adder
+}
+
+func findGatesWithInput(gates []Gate, needle string) []int {
+	var results []int
+
+	for i, gate := range gates {
+		if gate.A == needle || gate.B == needle {
+			results = append(results, i)
+		}
+	}
+
+	return results
+}
+
+func findGatesWithInputs(gates []Gate, a, b string) []int {
+	var results []int
+
+	for i, gate := range gates {
+		if gate.A == a && gate.B == b || gate.A == b && gate.B == a {
+			results = append(results, i)
+		}
+	}
+
+	return results
 }
